@@ -1,0 +1,136 @@
+---
+title: "Week3_Assignment_NYPD_Shooting"
+output: pdf_document
+date: '2022-08-12'
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(lubridate)
+url <- "https://data.cityofnewyork.us/api/views/833y-fsy8/rows.csv?accessType=DOWNLOAD"
+nypd = read_csv(url)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+```
+
+## Introduction
+This is an analysis of the NYPD Shooting incident. The dataset is obtained from <https://catalog.data.gov/dataset>. 
+In this analysis, I'm focusing on the seasonality of the incident.
+
+## Import Libraries and Data
+Here is the command to import libraries and the data. "tidyverse" is for cleaning the data. "lubridate" is used for converting the char column to date type. The original data is csv, so I use "read_csv" to import the data as a dataframe.
+```
+library(tidyverse)
+library(lubridate)
+url <- "https://data.cityofnewyork.us/api/views/833y-fsy8/rows.csv?accessType=DOWNLOAD"
+nypd = read_csv(url)
+```
+
+## Tidy and Transform the Data
+
+### Deleting unused variables, and converting the data types
+In this study, I delete the coloums below as they are not used.
+
+- INCIDENT_KEY
+- OCCUR_TIME
+- PRECINCT
+- JURISDICTION_CODE
+- LOCATION_DESC
+- STATISTICAL_MURDER_FLAG
+- PERP_AGE_GROUP
+- PERP_SEX
+- PERP_RACE
+- VIC_SEX
+- VIC_RACE
+- X_COORD_CD
+- Y_COORD_CD
+- Latitude
+- Longitude
+- Lon_Lat
+
+```{r delete}
+nypd <- nypd %>% select(-c(INCIDENT_KEY, OCCUR_TIME, PRECINCT, JURISDICTION_CODE, LOCATION_DESC, STATISTICAL_MURDER_FLAG, PERP_AGE_GROUP, PERP_SEX, PERP_RACE, VIC_SEX, VIC_RACE, X_COORD_CD, Y_COORD_CD, Y_COORD_CD, Latitude, Longitude, Lon_Lat )) 
+```
+
+In Addition to the deletion, mutate the OCCUR_DATE to months for the later analysis.
+```{r tidy}
+nypd <- nypd %>% mutate(OCCUR_DATE = month(mdy(OCCUR_DATE))) %>% rename("OCCUR_MONTH"=OCCUR_DATE)
+```
+
+Let's see the summary of the data.
+```{r summary}
+summary(nypd)
+```
+
+## Visualization of the Data
+Now, we're ready to analyze the seasonality by visualizing the data. 
+
+```{r pressure, echo=FALSE}
+nypd_month <- nypd %>% group_by(OCCUR_MONTH) %>% count(VIC_AGE_GROUP) %>% pivot_wider(names_from = "VIC_AGE_GROUP", values_from = n)
+nypd_month %>% ggplot(aes(x = OCCUR_MONTH, y = `<18`)) + geom_point(aes(color = "<18")) + geom_line(aes(color = "<18")) + geom_point(aes(y = `18-24`,color = "18-24" )) + geom_line(aes(y = `18-24`, color = "18-24")) + geom_point(aes(y = `25-44`,color = "25-44" )) + geom_line(aes(y = `25-44`, color = "25-44")) + geom_point(aes(y = `45-64`,color = "45-64" )) + geom_line(aes(y = `45-64`, color = "45-64")) + geom_point(aes(y = `65+`,color = "65+" )) + geom_line(aes(y = `65+`, color = "65+")) + geom_point(aes(y = `UNKNOWN`,color = "UNKNOWN" )) + geom_line(aes(y = `UNKNOWN`, color = "UNKNOWN")) + labs(x="Month", y="Number of Victims") + scale_x_continuous(breaks=seq(1,12,1))
+```
+As the visualization shows, summer is the worst time especially. Note that 65+ age group shows almost no seasonality. The most of the incidents comes from the age groups of 18-24 and 25-44.
+
+The question was raised by this visualization. Is this all the same across the BOROs?
+```{r boro}
+nypd %>% count(BORO)
+```
+Caution: From here, I will ignore UNKNOW age group because it doesn't change the conclusion.
+
+## Bronx
+Bronx shows the same trend as the overall data except for June. There is a spike in June. 
+
+
+```{r bronx}
+nypd_bronx <- nypd[nypd$BORO=="BRONX",]
+nypd_bronx_month <- nypd_bronx %>% group_by(OCCUR_MONTH) %>% count(VIC_AGE_GROUP) %>% pivot_wider(names_from = "VIC_AGE_GROUP", values_from = n)
+nypd_bronx_month %>% ggplot(aes(x = OCCUR_MONTH, y = `<18`)) + geom_point(aes(color = "<18")) + geom_line(aes(color = "<18")) + geom_point(aes(y = `18-24`,color = "18-24" )) + geom_line(aes(y = `18-24`, color = "18-24")) + geom_point(aes(y = `25-44`,color = "25-44" )) + geom_line(aes(y = `25-44`, color = "25-44")) + geom_point(aes(y = `45-64`,color = "45-64" )) + geom_line(aes(y = `45-64`, color = "45-64")) + geom_point(aes(y = `65+`,color = "65+" )) + geom_line(aes(y = `65+`, color = "65+")) + labs(x="Month", y="Number of Victims") + scale_x_continuous(breaks=seq(1,12,1))
+```
+
+### Brooklyn
+Broooklyn also shows the same trend as the overall data. 
+
+
+```{r brooklyn}
+nypd_brooklyn <- nypd[nypd$BORO=="BROOKLYN",]
+nypd_brooklyn_month <- nypd_brooklyn %>% group_by(OCCUR_MONTH) %>% count(VIC_AGE_GROUP) %>% pivot_wider(names_from = "VIC_AGE_GROUP", values_from = n)
+nypd_brooklyn_month %>% ggplot(aes(x = OCCUR_MONTH, y = `<18`)) + geom_point(aes(color = "<18")) + geom_line(aes(color = "<18")) + geom_point(aes(y = `18-24`,color = "18-24" )) + geom_line(aes(y = `18-24`, color = "18-24")) + geom_point(aes(y = `25-44`,color = "25-44" )) + geom_line(aes(y = `25-44`, color = "25-44")) + geom_point(aes(y = `45-64`,color = "45-64" )) + geom_line(aes(y = `45-64`, color = "45-64")) + geom_point(aes(y = `65+`,color = "65+" )) + geom_line(aes(y = `65+`, color = "65+")) + labs(x="Month", y="Number of Victims") + scale_x_continuous(breaks=seq(1,12,1))
+```
+
+### Manhattan
+Manhattan is a bit different. 18-24 and 25-44 doesn't look following the same trend. It is not a simple bell curve trend unlike other areas. I am not sure the reason but maybe there are big events that target different age groups. 
+
+
+```{r manhattan}
+nypd_manhattan <- nypd[nypd$BORO=="MANHATTAN",]
+nypd_manhattan_month <- nypd_manhattan %>% group_by(OCCUR_MONTH) %>% count(VIC_AGE_GROUP) %>% pivot_wider(names_from = "VIC_AGE_GROUP", values_from = n)
+nypd_manhattan_month %>% ggplot(aes(x = OCCUR_MONTH, y = `<18`)) + geom_point(aes(color = "<18")) + geom_line(aes(color = "<18")) + geom_point(aes(y = `18-24`,color = "18-24" )) + geom_line(aes(y = `18-24`, color = "18-24")) + geom_point(aes(y = `25-44`,color = "25-44" )) + geom_line(aes(y = `25-44`, color = "25-44")) + geom_point(aes(y = `45-64`,color = "45-64" )) + geom_line(aes(y = `45-64`, color = "45-64")) + geom_point(aes(y = `65+`,color = "65+" )) + geom_line(aes(y = `65+`, color = "65+")) + labs(x="Month", y="Number of Victims") + scale_x_continuous(breaks=seq(1,12,1))
+```
+
+### Queens
+Queens are much more flat than other areas. The graph shows long running peak during spring to summer.
+
+
+```{r queens}
+nypd_queens <- nypd[nypd$BORO=="QUEENS",]
+nypd_queens_month <- nypd_queens %>% group_by(OCCUR_MONTH) %>% count(VIC_AGE_GROUP) %>% pivot_wider(names_from = "VIC_AGE_GROUP", values_from = n)
+nypd_queens_month %>% ggplot(aes(x = OCCUR_MONTH, y = `<18`)) + geom_point(aes(color = "<18")) + geom_line(aes(color = "<18")) + geom_point(aes(y = `18-24`,color = "18-24" )) + geom_line(aes(y = `18-24`, color = "18-24")) + geom_point(aes(y = `25-44`,color = "25-44" )) + geom_line(aes(y = `25-44`, color = "25-44")) + geom_point(aes(y = `45-64`,color = "45-64" )) + geom_line(aes(y = `45-64`, color = "45-64")) + geom_point(aes(y = `65+`,color = "65+" )) + geom_line(aes(y = `65+`, color = "65+")) + labs(x="Month", y="Number of Victims") + scale_x_continuous(breaks=seq(1,12,1))
+```
+
+### STATEN ISLAND
+Staten Island looks different while it is still showing the peak in July and August. It is because the number of incidents is quite low.
+
+
+```{r statenisland}
+nypd_sisland <- nypd[nypd$BORO=="STATEN ISLAND",]
+nypd_sisland_month <- nypd_sisland %>% group_by(OCCUR_MONTH) %>% count(VIC_AGE_GROUP) %>% pivot_wider(names_from = "VIC_AGE_GROUP", values_from = n)
+nypd_sisland_month %>% ggplot(aes(x = OCCUR_MONTH, y = `<18`)) + geom_point(aes(color = "<18")) + geom_line(aes(color = "<18")) + geom_point(aes(y = `18-24`,color = "18-24" )) + geom_line(aes(y = `18-24`, color = "18-24")) + geom_point(aes(y = `25-44`,color = "25-44" )) + geom_line(aes(y = `25-44`, color = "25-44")) + geom_point(aes(y = `45-64`,color = "45-64" )) + geom_line(aes(y = `45-64`, color = "45-64")) + geom_point(aes(y = `65+`,color = "65+" )) + geom_line(aes(y = `65+`, color = "65+")) + labs(x="Month", y="Number of Victims") + scale_x_continuous(breaks=seq(1,12,1))
+```
+
+## Conclustion
+NYPD data shows a clear seasonality as a whole. The shooting cases in July and August are notably high. But by looking at the each borough closely, I found that 
+
+- The seasonality is mainly from Bronx and Brooklyn. The data in others are relatively flat.
+- In all borough, the majority of victims are age of 18-44.
+- In all borough, February and March are relatively calm.
+
+I am biased that the highest age group. I assumed that 18-24 is higher than any other age group because it is the most active age. But the analysis shows the 25-44 is the largest age group. I guess it is because the 25-44 age group has more chance to go to the unfamiliar places due to the work. That leads them to unexpected results.
