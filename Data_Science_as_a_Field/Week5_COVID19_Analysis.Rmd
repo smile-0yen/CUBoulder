@@ -1,0 +1,123 @@
+---
+title: "Week5_COVID19_Analysis"
+output: pdf_document
+date: "2022-08-14"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(lubridate)
+```
+
+# Summary
+
+This is an analysis on COVID-19 data from Johns Hopkins. The data is retrieved from https://github.com/CSSEGISandData/COVID-19.
+In this study, I examined the differences between Japan and the UK in terms of the new cases and deaths.
+Until recently, Japan is one of the countries that apply strong policies to restrain COVID-19 cases. 
+On the other hand, the UK adopts light restrictions to save the economy.
+The comparison implies that COVID-19 cannot be zero, and the number of cases/deaths surges whenever the restriction is lifted.
+
+# Import Data
+
+Here is how to read the data. All files are CSV format. So, I use read_csv to read the data. 
+```{r importdata}
+url_in <- "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/"
+file_names <- c("time_series_covid19_confirmed_global.csv",
+                 "time_series_covid19_deaths_global.csv"
+                 )
+urls <- str_c(url_in, file_names)
+uid_lookup_url <- "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/UID_ISO_FIPS_LookUp_Table.csv"
+
+global_cases <- read_csv(urls[1], show_col_types = FALSE)
+global_deaths <- read_csv(urls[2], show_col_types = FALSE)
+uid <- read_csv(uid_lookup_url) 
+```
+
+# Tidy the data
+
+For this analysis, I do not use latitude and longitude because I will not use them. Then, change the date rows to columns. 
+```{r tidy}
+global_cases <- global_cases %>% select(-c(`Province/State`, Lat, Long))
+global_cases <- global_cases %>% pivot_longer(cols = -c(`Country/Region`), names_to = "date", values_to = "cases")
+```
+The date column type is not Date object but Char. Let's convert is to date type. 
+```{r summary}
+summary(global_cases)
+global_cases <- global_cases %>% mutate(date = mdy(date))
+summary(global_cases)
+```
+
+Now, it is clear that the data contains the data from 2020-01-22 to 2022-08-12.
+
+I'll do the same to another data.
+```{r tidy_death}
+global_deaths <- global_deaths %>% select(-c(`Province/State`, Lat, Long))
+global_deaths <- global_deaths %>% pivot_longer(cols = -c(`Country/Region`), names_to = "date", values_to = "deaths")
+global_deaths <- global_deaths %>% mutate(date = mdy(date))
+```
+
+I will combine those two data as a data frame called global. For convenience, I'll rename the colums as well.
+```{r global}
+global <- global_cases %>% full_join(global_deaths)
+global <- global %>% rename(Country_Region = `Country/Region`)
+```
+
+For the later analysis, filter the date by cases more than 0.
+```{r summary_global}
+global <- global %>% filter(cases>0)
+```
+Add the population to the data frame. Now, I have the data with number of cases, deaths, and population in each country per day from 2020-01-22 to 2022-08-12.
+```{r population}
+uid <- uid %>% select(-c(Lat, Long_, Combined_Key, code3, iso2, iso3, Admin2))
+global <- global %>% left_join(uid, by = c("Country_Region")) 
+global <- global %>% select(-c(UID, FIPS)) 
+global <- global %>% select(Country_Region, date, cases, deaths, Population)
+summary(global)
+```
+As the last step, add the number of new cases/deaths.
+```{r per_population}
+global <- global %>% group_by(Country_Region, date)
+global <- global %>% summarise(cases = sum(cases), deaths = sum(deaths), Population = sum(Population))
+global <- global %>% mutate(new_cases = cases - lag(cases), new_deaths = deaths - lag(deaths))
+```
+
+# Analysis
+
+Here is the number of new cases and new deaths in Japan. Japan kept the number of deaths low. 
+In Oct 2021, Kishida became the prime minister. He ceased a number of restrictions to rescue the economy.
+That results in a rapid increase of the new cases. 
+Although the number of death is still relatively low, it will increase since the peak of deaths will come after the peak of cases.
+
+```{r japan}
+japan <- global[global$Country_Region=="Japan",] %>% filter(cases>0) %>% filter(new_cases>0) %>% filter(deaths>0) %>% filter(new_deaths > 0)
+japan %>% ggplot(aes(x = date, y = cases)) + geom_line(aes(color = "cases")) + geom_line(aes(y = deaths, color = "deaths")) + scale_y_log10()
+japan %>% ggplot(aes(x = date, y = new_cases)) + geom_line(aes(color = "new_cases")) + geom_line(aes(y = new_deaths, color = "new_deaths")) + scale_y_log10()
+```
+The UK went through a completely different path. UK government tried to remove the restriction earlier to save the economy.
+As a result, the number of cases and deaths are much higher than in Japan, even though the population in the UK is half of Japan's population.
+The number of cases and deaths has kept being high. It seems the UK accepted the risk of losing their health.
+
+```{r uk}
+uk <- global[global$Country_Region=="United Kingdom",] %>% filter(cases>0) %>% filter(new_cases>0) %>% filter(deaths>0) %>% filter(new_deaths > 0) 
+uk %>% ggplot(aes(x = date, y = cases)) + geom_line(aes(color = "cases")) + geom_point(aes(color = "cases")) + geom_line(aes(y = deaths, color = "deaths")) + geom_point(aes(y = deaths, color = "deaths")) + scale_y_log10()
+uk %>% ggplot(aes(x = date, y = new_cases)) + geom_line(aes(color = "new_cases")) + geom_line(aes(y = new_deaths, color = "new_deaths")) + scale_y_log10()
+```
+
+# Conclusion
+
+In Japan, the analysis shows that the lift of the restriction causes an increase in cases.
+Japan has adopted the "hammer and dance" strategy against COVID-19.
+That resulted in multiple waves of new cases.
+It is clear that there is a correlation between the government restriction policy and the number of cases.
+
+I have been biased that the UK (and other countries) applied strong movement restrictions (lockdown) as Japan had at least at the beginning of the pandemic.
+But according to the historical data of cases and deaths, the restriction would not be effective in the UK as I thought it was.
+
+Another bias I had is related to the number of waves. 
+I assumed the UK also changed policies several times as Japan did. But it is not clear from the graph.
+The reason would be either change of the restriction didn't affect the people's behavior, or the government policy has been relatively consistent in the last two years.
+
+I speculate that people in the UK have a stronger belief in the freedom of mobility.
+Under that situation, the strong restriction only hurts the economy and doesn't work effectively to suppress COVID-19 cases.
+It is important to understand how people react to the policy so that we can have a healthy and safe life.
